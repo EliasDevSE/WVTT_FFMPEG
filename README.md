@@ -2,6 +2,10 @@
 
 Patches to add support for WebVTT subtitles stored in ISOBMFF boxes (codec tag `wvtt`) inside MP4/MOV containers.
 
+## License
+
+Use this whoever the hell you want to be honest, I just thought it was a stupid problem and was surprised no one came over it in 20 years. 
+
 ## Problem
 
 FFmpeg 7.0 doesn't recognize wvtt subtitle tracks in MP4 files. They show up as:
