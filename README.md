@@ -4,7 +4,7 @@ Patches to add support for WebVTT subtitles stored in ISOBMFF boxes (codec tag `
 
 ## License
 
-Use this whoever the hell you want to be honest, I just thought it was a stupid problem and was surprised no one came over it in 20 years. 
+Use this however the hell you want to be honest, I just thought it was a stupid problem and was surprised no one came over it in 20 years. 
 
 ## Problem
 
