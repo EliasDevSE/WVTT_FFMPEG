@@ -78,7 +78,7 @@ ffmpeg -i input.mp4 -map 0:v -map 0:a -map 0:s \
 
 ## Technical Details
 
-wvtt samples in MP4 are binary ISOBMFF boxes per ISO 14496-30:
+wvtt samples in MP4 are binary ISOBMFF boxes per [ISO 14496-30] (https://www.iso.org/standard/63107.html?__cf_chl_tk=1.QT0s2d75.re0rWEV258cyWyVP59nN7URWsxNXf8jE-1771012949-1.0.1.1-MhXLRXcp2gJcAAF8x.DrS3fciD_PyyBqoy1htqIQU00):
 - `vttc` box contains cue data with `payl` (payload text), `sttg` (settings), `iden` (id)
 - `vtte` box is an empty cue
 
