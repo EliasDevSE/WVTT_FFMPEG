@@ -1,13 +1,22 @@
---- a/libavformat/movenc.c	2026-02-13 18:45:42.427686500 +0100
-+++ b/libavformat/movenc.c	2026-02-13 18:49:04.136607200 +0100
-@@ -2005,6 +2005,14 @@
+diff --git a/libavformat/movenc.c b/libavformat/movenc.c
+index e40948e..b3f4bb8 100644
+--- a/libavformat/movenc.c
++++ b/libavformat/movenc.c
+@@ -53,6 +53,7 @@
+ #include "libavutil/channel_layout.h"
+ #include "libavutil/csp.h"
+ #include "libavutil/intfloat.h"
++#include "libavutil/intreadwrite.h"
+ #include "libavutil/mathematics.h"
+ #include "libavutil/libm.h"
+ #include "libavutil/opt.h"
+@@ -2005,6 +2006,13 @@ static int mov_write_subtitle_tag(AVFormatContext *s, AVIOContext *pb, MOVTrack
                     track->track_id);
              return AVERROR(EINVAL);
          }
 +    } else if (track->par->codec_id == AV_CODEC_ID_WEBVTT) {
-+        /* write vttC box with config string */
 +        int64_t vttC_pos = avio_tell(pb);
-+        avio_wb32(pb, 0); /* size */
++        avio_wb32(pb, 0);
 +        ffio_wfourcc(pb, "vttC");
 +        if (track->par->extradata_size)
 +            avio_write(pb, track->par->extradata, track->par->extradata_size);
@@ -15,7 +24,85 @@
      } else if (track->par->extradata_size)
          avio_write(pb, track->par->extradata, track->par->extradata_size);
  
-@@ -8155,6 +8163,7 @@
+@@ -6546,6 +6554,63 @@ err:
+     return ret;
+ }
+ 
++static int mov_create_wvtt_sample(AVPacket *pkt)
++{
++    AVBufferRef *buf;
++    uint8_t *p;
++    int new_size;
++    const uint8_t *iden = NULL, *sttg = NULL;
++    size_t iden_size = 0, sttg_size = 0;
++
++    if (pkt->size == 0) {
++        new_size = 8;
++    } else {
++        iden = av_packet_get_side_data(pkt, AV_PKT_DATA_WEBVTT_IDENTIFIER,
++                                       &iden_size);
++        sttg = av_packet_get_side_data(pkt, AV_PKT_DATA_WEBVTT_SETTINGS,
++                                       &sttg_size);
++        new_size = 8 + 8 + pkt->size
++                 + (iden_size ? 8 + (int)iden_size : 0)
++                 + (sttg_size ? 8 + (int)sttg_size : 0);
++    }
++
++    buf = av_buffer_alloc(new_size + AV_INPUT_BUFFER_PADDING_SIZE);
++    if (!buf)
++        return AVERROR(ENOMEM);
++    memset(buf->data + new_size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
++
++    p = buf->data;
++    if (pkt->size == 0) {
++        AV_WB32(p,     8);
++        AV_WL32(p + 4, MKTAG('v','t','t','e'));
++    } else {
++        AV_WB32(p,     new_size);
++        AV_WL32(p + 4, MKTAG('v','t','t','c'));
++        p += 8;
++        if (iden_size) {
++            AV_WB32(p,     8 + (int)iden_size);
++            AV_WL32(p + 4, MKTAG('i','d','e','n'));
++            memcpy(p + 8, iden, iden_size);
++            p += 8 + iden_size;
++        }
++        if (sttg_size) {
++            AV_WB32(p,     8 + (int)sttg_size);
++            AV_WL32(p + 4, MKTAG('s','t','t','g'));
++            memcpy(p + 8, sttg, sttg_size);
++            p += 8 + sttg_size;
++        }
++        AV_WB32(p,     8 + pkt->size);
++        AV_WL32(p + 4, MKTAG('p','a','y','l'));
++        memcpy(p + 8, pkt->data, pkt->size);
++    }
++
++    av_buffer_unref(&pkt->buf);
++    pkt->buf  = buf;
++    pkt->data = buf->data;
++    pkt->size = new_size;
++    return 0;
++}
++
+ static int mov_write_single_packet(AVFormatContext *s, AVPacket *pkt)
+ {
+     MOVMuxContext *mov = s->priv_data;
+@@ -6558,6 +6623,13 @@ static int mov_write_single_packet(AVFormatContext *s, AVPacket *pkt)
+     if (ret < 0)
+         return ret;
+ 
++    if (par->codec_id == AV_CODEC_ID_WEBVTT) {
++        ret = mov_create_wvtt_sample(pkt);
++        if (ret < 0)
++            return ret;
++        size = pkt->size;
++    }
++
+     if (mov->flags & FF_MOV_FLAG_FRAG_DISCONT) {
+         for (int i = 0; i < mov->nb_streams; i++)
+             mov->tracks[i].frag_discont = 1;
+@@ -8155,6 +8227,7 @@ static const AVCodecTag codec_mp4_tags[] = {
      { AV_CODEC_ID_MPEGH_3D_AUDIO,  MKTAG('m', 'h', 'm', '1') },
      { AV_CODEC_ID_TTML,            MOV_MP4_TTML_TAG          },
      { AV_CODEC_ID_TTML,            MOV_ISMV_TTML_TAG         },
